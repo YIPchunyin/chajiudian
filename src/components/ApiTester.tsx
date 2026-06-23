@@ -37,14 +37,30 @@ const DEFAULT_RAW_REQUEST =
   '\n' +
   '{"poiId":"","pageSize":10,"pageIndex":1,"pageSource":"hotelList","newCurrentCityName":"\\u9999\\u6e2f","commitOrderServiceGroup":"C","notShowGuideInfoType":[],"notShowInfoType":[],"abGroup":{"pointsPayRoom":"B","autoSwitchRecommendSort":"A","_localBasicUseOldSortGroupNew":"A"},"searchDicts":"[{\\"key\\":\\"orderBy\\",\\"value\\":\\"0\\",\\"name\\":\\"\\u63a8\\u8350\\u6392\\u5e8f\\"}]","cityName":"\\u5317\\u4eac","cityType":"cities","checkInDate":"2026-06-23","checkOutDate":"2026-06-24","source":"1","hasUsePositioning":false,"uuid":"rzNZQD2i6ykFsGbtyQMYac2CxGppkxyH"}';
 
+function extractHost(rawRequest: string): string {
+  const lines = rawRequest.split('\n');
+  for (const line of lines) {
+    const trimmed = line.replace(/\r$/, '').trim();
+    if (trimmed.toLowerCase().startsWith('host:')) {
+      const host = trimmed.substring(5).trim();
+      return 'https://' + host;
+    }
+  }
+  return '';
+}
+
 export default function ApiTester() {
-  const [url, setUrl] = useState('https://hweb-hotel.huazhu.com');
   const [rawRequest, setRawRequest] = useState(DEFAULT_RAW_REQUEST);
   const [response, setResponse] = useState<ProxyResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSend = async () => {
-    if (!url.trim() || !rawRequest.trim()) return;
+    if (!rawRequest.trim()) return;
+    const url = extractHost(rawRequest);
+    if (!url) {
+      setResponse({ success: false, error: '\u672a\u627e\u5230 Host \u5934\uff0c\u8bf7\u786e\u4fdd\u539f\u59cb\u8bf7\u6c42\u4e2d\u5305\u542b Host \u5b57\u6bb5' });
+      return;
+    }
     setLoading(true);
     setResponse(null);
 
@@ -52,7 +68,7 @@ export default function ApiTester() {
       const res = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), rawRequest: rawRequest }),
+        body: JSON.stringify({ url, rawRequest }),
       });
       const json = await res.json();
       setResponse(json);
@@ -69,17 +85,6 @@ export default function ApiTester() {
         <span>{String.fromCodePoint(0x1f4e1)}</span>
         <span>API {'\u8bf7\u6c42\u6d4b\u8bd5'}</span>
       </h2>
-
-      <div className='mb-3'>
-        <label className='block text-sm font-medium text-gray-600 mb-1'>Base URL</label>
-        <input
-          type='text'
-          className='w-full border rounded-lg px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent'
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder='https://hweb-hotel.huazhu.com'
-        />
-      </div>
 
       <div className='mb-3'>
         <label className='block text-sm font-medium text-gray-600 mb-1'>
