@@ -37,8 +37,8 @@ export default function BatchCheck() {
   const [searchHits, setSearchHits] = useState(0);
   const [canUseCount, setCanUseCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
-  const [checkIn, setCheckIn] = useState('2026-07-01');
-  const [checkOut, setCheckOut] = useState('2026-07-02');
+  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().split('T')[0]);
+  const [checkOut, setCheckOut] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; });
 
   const handleCheck = async () => {
     const text = input.trim();

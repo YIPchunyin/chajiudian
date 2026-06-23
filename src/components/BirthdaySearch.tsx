@@ -44,7 +44,9 @@ export default function BirthdaySearch({ keyword, onViewAllCoupons, onBack }: Bi
     setRawData(null);
 
     try {
-      const res = await fetch('/api/hotel/search-birthday?keyword=' + encodeURIComponent(keyword) + '&checkIn=2026-07-01&checkOut=2026-07-02');
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const res = await fetch('/api/hotel/search-birthday?keyword=' + encodeURIComponent(keyword) + '&checkIn=' + today + '&checkOut=' + tomorrow);
       const json = await res.json();
       setRawData(json);
       if (json.success) {

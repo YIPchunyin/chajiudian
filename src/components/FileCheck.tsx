@@ -22,8 +22,8 @@ export default function FileCheck() {
   const [recent10, setRecent10] = useState<ProgressItem[]>([]);
   const [fileKey, setFileKey] = useState('');
   const [error, setError] = useState('');
-  const [checkIn, setCheckIn] = useState('2026-07-01');
-  const [checkOut, setCheckOut] = useState('2026-07-02');
+  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().split('T')[0]);
+  const [checkOut, setCheckOut] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; });
   const abortRef = useRef<AbortController | null>(null);
 
   const handleSubmit = async () => {

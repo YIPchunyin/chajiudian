@@ -9,11 +9,11 @@ import FileCheck from '@/components/FileCheck';
 import ScrapeAll from '@/components/ScrapeAll';
 import JsonViewer from '@/components/JsonViewer';
 
-const DEFAULT_FORM: HotelRequest = {
+const getDefaultForm = (): HotelRequest => ({
   activityId: '',
   allowedBenefitsTicket: true,
-  checkIn: '2026-07-01',
-  checkOut: '2026-07-02',
+  checkIn: new Date().toISOString().split('T')[0],
+  checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
   couponCaller: '9',
   hotelId: '',
   isCanUseEcoupon: 1,
@@ -24,7 +24,7 @@ const DEFAULT_FORM: HotelRequest = {
   ratePlanCode: 'Base-OII-STD',
   roomPrices: '237.15',
   needPreCoupon: false,
-};
+});
 
 const COUPON_TYPE_LABELS: Record<number, string> = {
   1: '\u6298\u6263\u5238',
@@ -40,7 +40,7 @@ export default function Home() {
   const [searchInput, setSearchInput] = useState('');
   const [searchHotelId, setSearchHotelId] = useState<string | null>(null);
   const [searchHotelName, setSearchHotelName] = useState<string>('');
-  const [form, setForm] = useState<HotelRequest>(DEFAULT_FORM);
+  const [form, setForm] = useState<HotelRequest>(getDefaultForm());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<HotelResponse | null>(null);
   const [error, setError] = useState('');
