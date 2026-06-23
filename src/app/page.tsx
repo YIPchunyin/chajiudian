@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { HotelRequest, HotelResponse } from '@/types/hotel';
 import BirthdaySearch from '@/components/BirthdaySearch';
 import ApiTester from '@/components/ApiTester';
+import BatchCheck from '@/components/BatchCheck';
 import JsonViewer from '@/components/JsonViewer';
 
 const DEFAULT_FORM: HotelRequest = {
@@ -31,7 +32,7 @@ const COUPON_TYPE_LABELS: Record<number, string> = {
 type Step = 'search' | 'birthday' | 'coupon';
 
 export default function Home() {
-  const [mode, setMode] = useState<'coupon' | 'api'>('coupon');
+  const [mode, setMode] = useState<'coupon' | 'api' | 'batch'>('coupon');
   const [step, setStep] = useState<Step>('search');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -91,15 +92,14 @@ export default function Home() {
     }
   };
 
-  const switchMode = (newMode: 'coupon' | 'api') => {
+  const switchMode = (newMode: 'coupon' | 'api' | 'batch') => {
     setMode(newMode);
-    if (newMode === 'coupon') {
-      setStep('search');
-      setSearchKeyword('');
-      setSearchHotelId(null);
-      setResult(null);
-      setError('');
-    }
+    if (newMode === 'api') return;
+    setStep('search');
+    setSearchKeyword('');
+    setSearchHotelId(null);
+    setResult(null);
+    setError('');
   };
 
   const renderCoupon = (c: any, idx: number) => (
@@ -128,28 +128,31 @@ export default function Home() {
         <div className='flex items-center justify-between mb-4'>
           <div>
             <h1 className='text-3xl font-bold text-gray-800'>{String.fromCodePoint(0x1f3f7)} {'\u534e\u4f4f\u9152\u5e97\u4f18\u60e0\u5238\u722c\u866b'}</h1>
-            <p className='text-gray-500 text-sm mt-1'>{mode === 'coupon' ? '\u641c\u7d22\u9152\u5e97\uff0c\u81ea\u52a8\u68c0\u67e5\u524d3\u540d\u9152\u5e97\u7684\u751f\u65e5\u4e5d\u6298\u5238' : '\u586b\u5199 URL \u548c\u539f\u59cb\u8bf7\u6c42\u8fdb\u884c API \u6d4b\u8bd5'}</p>
           </div>
           <div className='flex gap-1 bg-gray-200 rounded-lg p-1'>
             <button
               onClick={() => switchMode('coupon')}
-              className={'px-4 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-            >
-              {String.fromCodePoint(0x1f382)} {'\u4f18\u60e0\u5238'}
-            </button>
+              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+            >{String.fromCodePoint(0x1f382)} {'\u641c\u7d22'}</button>
+            <button
+              onClick={() => switchMode('batch')}
+              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'batch' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+            >{String.fromCodePoint(0x1f4ca)} {'\u6279\u91cf'}</button>
             <button
               onClick={() => switchMode('api')}
-              className={'px-4 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-            >
-              {String.fromCodePoint(0x1f4e1)} API
-            </button>
+              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+            >{String.fromCodePoint(0x1f4e1)} API</button>
           </div>
         </div>
+
+        {mode === 'batch' && <BatchCheck />}
 
         {mode === 'api' && <ApiTester />}
 
         {mode === 'coupon' && (
           <>
+            <p className='text-gray-500 text-sm mb-6'>{'\u641c\u7d22\u9152\u5e97\uff0c\u81ea\u52a8\u68c0\u67e5\u524d3\u540d\u9152\u5e97\u7684\u751f\u65e5\u4e5d\u6298\u5238'}</p>
+
             <div className='flex items-center gap-2 mb-6 text-sm'>
               <StepDot step={1} label={'\u641c\u7d22\u5173\u952e\u8bcd'} active={step === 'search'} done={step !== 'search'} />
               <StepLine />
@@ -170,23 +173,13 @@ export default function Home() {
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
                   />
-                  <button
-                    onClick={handleSearch}
-                    className='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm'
-                  >
-                    {String.fromCodePoint(0x1f50d)} {'\u641c\u7d22'}
-                  </button>
+                  <button onClick={handleSearch} className='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm'>{String.fromCodePoint(0x1f50d)} {'\u641c\u7d22'}</button>
                 </div>
-                <p className='text-xs text-gray-400 mt-3'>{'\u793a\u4f8b: \u8f93\u5165\u201c\u5357\u4eac\u201d\u3001\u201c\u5317\u4eac\u201d\u6216\u201c\u6c49\u5ead\u5357\u4eac\u201d\u7b49\u5173\u952e\u8bcd\u8fdb\u884c\u641c\u7d22'}</p>
               </div>
             )}
 
             {step === 'birthday' && searchKeyword && (
-              <BirthdaySearch
-                keyword={searchKeyword}
-                onViewAllCoupons={handleViewAllCoupons}
-                onBack={handleBack}
-              />
+              <BirthdaySearch keyword={searchKeyword} onViewAllCoupons={handleViewAllCoupons} onBack={handleBack} />
             )}
 
             {step === 'coupon' && searchHotelId && (
@@ -200,30 +193,12 @@ export default function Home() {
                 <div className='bg-white rounded-xl shadow p-6 mb-6'>
                   <h2 className='text-lg font-bold text-gray-800 mb-4'>{'\u67e5\u8be2\u5168\u90e8\u4f18\u60e0\u5238'}</h2>
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>hotelId</label>
-                      <input type='text' className='w-full border rounded-lg px-3 py-2 text-sm bg-gray-100' value={form.hotelId} disabled />
-                    </div>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>{'\u5165\u4f4f\u65e5\u671f'}</label>
-                      <input type='date' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.checkIn} onChange={(e) => handleChange('checkIn', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>{'\u79bb\u5e97\u65e5\u671f'}</label>
-                      <input type='date' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.checkOut} onChange={(e) => handleChange('checkOut', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>{'\u623f\u4ef7 (marketPrices)'}</label>
-                      <input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.marketPrices} onChange={(e) => handleChange('marketPrices', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>{'\u623f\u4ef7 (roomPrices)'}</label>
-                      <input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.roomPrices} onChange={(e) => handleChange('roomPrices', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className='block text-sm font-medium text-gray-600 mb-1'>ratePlanCode</label>
-                      <input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.ratePlanCode} onChange={(e) => handleChange('ratePlanCode', e.target.value)} />
-                    </div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>hotelId</label><input type='text' className='w-full border rounded-lg px-3 py-2 text-sm bg-gray-100' value={form.hotelId} disabled /></div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>{'\u5165\u4f4f\u65e5\u671f'}</label><input type='date' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.checkIn} onChange={(e) => handleChange('checkIn', e.target.value)} /></div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>{'\u79bb\u5e97\u65e5\u671f'}</label><input type='date' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.checkOut} onChange={(e) => handleChange('checkOut', e.target.value)} /></div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>{'\u623f\u4ef7 (marketPrices)'}</label><input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.marketPrices} onChange={(e) => handleChange('marketPrices', e.target.value)} /></div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>{'\u623f\u4ef7 (roomPrices)'}</label><input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.roomPrices} onChange={(e) => handleChange('roomPrices', e.target.value)} /></div>
+                    <div><label className='block text-sm font-medium text-gray-600 mb-1'>ratePlanCode</label><input type='text' className='w-full border rounded-lg px-3 py-2 text-sm' value={form.ratePlanCode} onChange={(e) => handleChange('ratePlanCode', e.target.value)} /></div>
                   </div>
                   <button onClick={handleSubmit} disabled={loading} className='mt-5 w-full md:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition'>
                     {loading ? String.fromCodePoint(0x23f3) + ' \u6293\u53d6\u4e2d...' : String.fromCodePoint(0x1f680) + ' \u6293\u53d6\u5168\u90e8\u4f18\u60e0\u5238'}
@@ -249,17 +224,6 @@ export default function Home() {
                           </div>
                         </div>
                       )}
-                      {result.content.breakfastInfo && (
-                        <div className='bg-white rounded-xl shadow p-6'>
-                          <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f373)} {'\u65e9\u9910\u4fe1\u606f'}</h2>
-                          <div className='text-sm text-gray-600 space-y-1'>
-                            <div>{'\u5355\u4ef7'}: {'\u00a5'}{result.content.breakfastInfo.breakfastPrice}</div>
-                            <div>{'\u6bcf\u65e5\u6700\u591a'}: {result.content.breakfastInfo.maxBreakfastCountPerDay} {'\u4efd'}</div>
-                            {result.content.breakfastInfo.breakfastDailyPrice?.map((d: any, i: number) => <div key={i}>{d.date}: {'\u00a5'}{d.breakfastPrice}</div>)}
-                            <div className='text-xs text-gray-400 mt-1'>{result.content.breakfastInfo.tips}</div>
-                          </div>
-                        </div>
-                      )}
                       {result.content.couponList && Object.keys(result.content.couponList).length > 0 && (
                         <div className='bg-white rounded-xl shadow p-6'>
                           <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f39f)} {'\u53ef\u7528\u4f18\u60e0\u5238'}</h2>
@@ -275,12 +239,6 @@ export default function Home() {
                         <div className='bg-white rounded-xl shadow p-6'>
                           <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f4cc)} {'\u95e8\u69db\u5238'}</h2>
                           <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{result.content.thresholdList.map((c: any, i: number) => renderCoupon(c, i))}</div>
-                        </div>
-                      )}
-                      {result.content.recommendedCoupons && (
-                        <div className='bg-white rounded-xl shadow p-6'>
-                          <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x2b50)} {'\u63a8\u8350\u4f18\u60e0\u5238'}</h2>
-                          {renderCoupon(Object.values(result.content.recommendedCoupons)[0], 0)}
                         </div>
                       )}
                     </div>
