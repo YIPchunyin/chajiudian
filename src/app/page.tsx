@@ -6,6 +6,7 @@ import BirthdaySearch from '@/components/BirthdaySearch';
 import ApiTester from '@/components/ApiTester';
 import BatchCheck from '@/components/BatchCheck';
 import FileCheck from '@/components/FileCheck';
+import ScrapeAll from '@/components/ScrapeAll';
 import JsonViewer from '@/components/JsonViewer';
 
 const DEFAULT_FORM: HotelRequest = {
@@ -33,7 +34,7 @@ const COUPON_TYPE_LABELS: Record<number, string> = {
 type Step = 'search' | 'birthday' | 'coupon';
 
 export default function Home() {
-  const [mode, setMode] = useState<'coupon' | 'api' | 'batch' | 'file'>('coupon');
+  const [mode, setMode] = useState<'coupon' | 'api' | 'batch' | 'file' | 'scrape'>('coupon');
   const [step, setStep] = useState<Step>('search');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -93,9 +94,9 @@ export default function Home() {
     }
   };
 
-  const switchMode = (newMode: 'coupon' | 'api' | 'batch' | 'file') => {
+  const switchMode = (newMode: 'coupon' | 'api' | 'batch' | 'file' | 'scrape') => {
     setMode(newMode);
-    if (newMode === 'api' || newMode === 'file') return;
+    if (newMode === 'api' || newMode === 'file' || newMode === 'scrape') return;
     setStep('search');
     setSearchKeyword('');
     setSearchHotelId(null);
@@ -134,9 +135,12 @@ export default function Home() {
             <button onClick={() => switchMode('coupon')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f382)} {'\u641c\u7d22'}</button>
             <button onClick={() => switchMode('batch')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'batch' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4ca)} {'\u6279\u91cf'}</button>
             <button onClick={() => switchMode('file')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4c4)} {'\u8868\u683c'}</button>
+            <button onClick={() => switchMode('scrape')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'scrape' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} {'\u722c\u53d6'}</button>
             <button onClick={() => switchMode('api')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} API</button>
           </div>
         </div>
+
+        {mode === 'scrape' && <ScrapeAll />}
 
         {mode === 'file' && <FileCheck />}
 
@@ -147,7 +151,6 @@ export default function Home() {
         {mode === 'coupon' && (
           <>
             <p className='text-gray-500 text-sm mb-6'>{'\u641c\u7d22\u9152\u5e97\uff0c\u81ea\u52a8\u68c0\u67e5\u524d3\u540d\u9152\u5e97\u7684\u751f\u65e5\u4e5d\u6298\u5238'}</p>
-
             <div className='flex items-center gap-2 mb-6 text-sm'>
               <StepDot step={1} label={'\u641c\u7d22\u5173\u952e\u8bcd'} active={step === 'search'} done={step !== 'search'} />
               <StepLine />
@@ -155,7 +158,6 @@ export default function Home() {
               <StepLine />
               <StepDot step={3} label={'\u5168\u90e8\u4f18\u60e0\u5238'} active={step === 'coupon'} done={false} />
             </div>
-
             {step === 'search' && (
               <div className='bg-white rounded-xl shadow p-6 mb-6'>
                 <h2 className='text-lg font-bold text-gray-800 mb-4'>{'\u641c\u7d22\u9152\u5e97'}</h2>
@@ -165,18 +167,13 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {step === 'birthday' && searchKeyword && (
-              <BirthdaySearch keyword={searchKeyword} onViewAllCoupons={handleViewAllCoupons} onBack={handleBack} />
-            )}
-
+            {step === 'birthday' && searchKeyword && <BirthdaySearch keyword={searchKeyword} onViewAllCoupons={handleViewAllCoupons} onBack={handleBack} />}
             {step === 'coupon' && searchHotelId && (
               <>
                 <div className='bg-white rounded-lg shadow-sm border p-3 mb-4 flex items-center gap-3 text-sm flex-wrap'>
                   <span className='text-gray-500'>{'\u9152\u5e97'}:</span><span className='font-medium text-gray-800'>{searchHotelName}</span>
                   <button onClick={handleBack} className='text-blue-500 hover:text-blue-700 ml-auto'>{'\u2190 \u8fd4\u56de\u641c\u7d22'}</button>
                 </div>
-
                 <div className='bg-white rounded-xl shadow p-6 mb-6'>
                   <h2 className='text-lg font-bold text-gray-800 mb-4'>{'\u67e5\u8be2\u5168\u90e8\u4f18\u60e0\u5238'}</h2>
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -191,9 +188,7 @@ export default function Home() {
                     {loading ? String.fromCodePoint(0x23f3) + ' \u6293\u53d6\u4e2d...' : String.fromCodePoint(0x1f680) + ' \u6293\u53d6\u5168\u90e8\u4f18\u60e0\u5238'}
                   </button>
                 </div>
-
                 {error && <div className='bg-red-50 border border-red-200 text-red-600 rounded-lg p-4 mb-6'>{'\u274c'} {error}</div>}
-
                 {result && (
                   <>
                     <div className='max-w-5xl mx-auto mb-4'><JsonViewer data={result} title={'\u4f18\u60e0\u5238\u54cd\u5e94\u6570\u636e'} buttonLabel={'\u25b6 \u67e5\u770bJSON'} /></div>
