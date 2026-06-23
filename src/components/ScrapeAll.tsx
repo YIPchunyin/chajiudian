@@ -13,7 +13,6 @@ interface ProgressEvent {
   canUse90Percent?: boolean;
   has90Percent?: boolean;
   recent5?: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>;
-  existingCount?: number;
 }
 
 export default function ScrapeAll() {
@@ -44,7 +43,6 @@ export default function ScrapeAll() {
 
       const decoder = new TextDecoder();
       let buffer = '';
-
       while (true) {
         const { done: streamDone, value } = await reader.read();
         if (streamDone) break;
@@ -81,20 +79,18 @@ export default function ScrapeAll() {
       <div className="bg-white rounded-xl shadow p-6">
         <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
           <span>{String.fromCodePoint(0x1f4e1)}</span>
-          <span>{'\u9010\u57ce\u722c\u53d6\u5168\u90e8\u9152\u5e97'}</span>
+          <span>逐城爬取全部酒店</span>
         </h2>
-        <p className="text-xs text-gray-400 mb-4">
-          {'\u83b7\u53d6\u57ce\u5e02\u5217\u8868\uff0c\u9010\u57ce\u641c\u7d22\u9152\u5e97\uff0c\u68c0\u67e5\u751f\u65e5\u4e5d\u6298\u5238\uff0c\u7ed3\u679c\u5b58\u5165MongoDB'}
-        </p>
+        <p className="text-xs text-gray-400 mb-4">获取城市列表，逐城搜索酒店，检查生日九折券，结果存入MongoDB</p>
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div><label className="block text-sm font-medium text-gray-600 mb-1">{'\u5165\u4f4f\u65e5\u671f'}</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} disabled={running} /></div>
-          <div><label className="block text-sm font-medium text-gray-600 mb-1">{'\u79bb\u5e97\u65e5\u671f'}</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} disabled={running} /></div>
+          <div><label className="block text-sm font-medium text-gray-600 mb-1">入住日期</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} disabled={running} /></div>
+          <div><label className="block text-sm font-medium text-gray-600 mb-1">离店日期</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} disabled={running} /></div>
         </div>
         <div className="flex gap-2">
           <button onClick={handleStart} disabled={running} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
-            {running ? String.fromCodePoint(0x23f3) + ' \u722c\u53d6\u4e2d...' : String.fromCodePoint(0x1f4e1) + ' \u5f00\u59cb\u9010\u57ce\u722c\u53d6'}
+            {running ? String.fromCodePoint(0x23f3) + ' 爬取中...' : String.fromCodePoint(0x1f4e1) + ' 开始逐城爬取'}
           </button>
-          {running && <button onClick={handleStop} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">{String.fromCodePoint(0x26a0)} {'\u505c\u6b62'}</button>}
+          {running && <button onClick={handleStop} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">{String.fromCodePoint(0x26a0)} 停止</button>}
         </div>
       </div>
 
@@ -108,20 +104,20 @@ export default function ScrapeAll() {
             {progress.type === 'total' && '\u2139 ' + (progress.message || '')}
           </div>
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-600">{processed}</div><div className="text-xs text-blue-500">{'\u9152\u5e97'}</div></div>
-            <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-purple-600">{total}</div><div className="text-xs text-purple-500">{'\u57ce\u5e02'}</div></div>
-            <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-green-600">{cityProgress || '...'}</div><div className="text-xs text-green-500">{'\u8fdb\u5ea6'}</div></div>
+            <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-600">{processed}</div><div className="text-xs text-blue-500">酒店</div></div>
+            <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-purple-600">{total}</div><div className="text-xs text-purple-500">城市</div></div>
+            <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-green-600">{cityProgress || '...'}</div><div className="text-xs text-green-500">进度</div></div>
           </div>
-          {currentCity && <div className="text-sm text-gray-500 mb-3">{'\u5f53\u524d\u57ce\u5e02\uff1a'}<span className="font-semibold text-gray-700">{currentCity}</span></div>}
+          {currentCity && <div className="text-sm text-gray-500 mb-3">当前城市：<span className="font-semibold text-gray-700">{currentCity}</span></div>}
           {recent5.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-600 mb-2">{'\u6700\u8fd1\u5904\u7406\uff1a'}</h3>
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">最近处理：</h3>
               <div className="space-y-1.5">
                 {[...recent5].reverse().map((h, i) => (
                   <div key={i} className={'flex items-center justify-between rounded-lg px-3 py-2 text-sm ' + (h.canUse90Percent ? 'bg-green-50 border border-green-200' : h.has90Percent ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-100')}>
                     <span className="text-gray-700 font-medium truncate">{h.hotelName}</span>
                     <span className={'shrink-0 ml-2 text-xs font-bold px-2 py-0.5 rounded-full ' + (h.canUse90Percent ? 'bg-green-500 text-white' : h.has90Percent ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-300 text-gray-600')}>
-                      {h.canUse90Percent ? '\u2705 \u4e5d\u6298\u53ef\u7528' : h.has90Percent ? '\u274c \u4e5d\u6298\u4e0d\u53ef\u7528' : '\u26aa \u65e0\u4e5d\u6298'}
+                      {h.canUse90Percent ? '\u2705 九折可用' : h.has90Percent ? '\u274c 九折不可用' : '\u26aa 无九折'}
                     </span>
                   </div>
                 ))}
@@ -130,6 +126,14 @@ export default function ScrapeAll() {
           )}
         </div>
       )}
+
+      {/* Download chajiudian table */}
+      <div className="bg-white rounded-xl shadow p-6 text-center">
+        <a href="/api/download-chajiudian" download className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
+          {String.fromCodePoint(0x1f4e5)} 下载 chajiudian 表格
+        </a>
+        <p className="text-xs text-gray-400 mt-2">从MongoDB导出当前所有记录为Excel文件</p>
+      </div>
     </div>
   );
 }
