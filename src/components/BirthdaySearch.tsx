@@ -1,7 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
-import type { City } from '@/components/CitySelect';
+import { useState, useEffect } from 'react';
 import JsonViewer from '@/components/JsonViewer';
 
 interface HotelResult {
@@ -18,16 +17,25 @@ interface HotelResult {
 }
 
 interface BirthdaySearchProps {
-  city: City;
+  keyword: string;
   onViewAllCoupons: (hotelId: string, hotelName: string) => void;
   onBack: () => void;
 }
 
-export default function BirthdaySearch({ city, onViewAllCoupons, onBack }: BirthdaySearchProps) {
+export default function BirthdaySearch({ keyword, onViewAllCoupons, onBack }: BirthdaySearchProps) {
   const [results, setResults] = useState<HotelResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [rawData, setRawData] = useState<unknown>(null);
+
+  useEffect(() => {
+    if (keyword.trim()) {
+      handleSearch();
+    } else {
+      setResults([]);
+      setSearched(false);
+    }
+  }, [keyword]);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -36,7 +44,7 @@ export default function BirthdaySearch({ city, onViewAllCoupons, onBack }: Birth
     setRawData(null);
 
     try {
-      const res = await fetch('/api/hotel/search-birthday?keyword=' + encodeURIComponent(city.name) + '&checkIn=2026-07-01&checkOut=2026-07-02');
+      const res = await fetch('/api/hotel/search-birthday?keyword=' + encodeURIComponent(keyword) + '&checkIn=2026-07-01&checkOut=2026-07-02');
       const json = await res.json();
       setRawData(json);
       if (json.success) {
@@ -55,21 +63,12 @@ export default function BirthdaySearch({ city, onViewAllCoupons, onBack }: Birth
       <div className='flex items-center justify-between mb-4'>
         <h2 className='text-lg font-bold text-gray-800 flex items-center gap-2'>
           <span>{String.fromCodePoint(0x1f50d)}</span>
-          <span>{'\u641c\u7d22'}{city.name}{'\u9152\u5e97\u5e76\u67e5\u8be2\u751f\u65e5\u4e5d\u6298\u5238'}</span>
+          <span>{'\u641c\u7d22\u201c'}{keyword}{'\u201d\u7ed3\u679c'}</span>
         </h2>
-        <button onClick={onBack} className='text-sm text-blue-500 hover:text-blue-700'>{'\u2190 \u6362\u57ce\u5e02'}</button>
+        <button onClick={onBack} className='text-sm text-blue-500 hover:text-blue-700'>{'\u2190 \u8fd4\u56de'}</button>
       </div>
 
-      {!searched && !loading && (
-        <div className='text-center py-6'>
-          <button onClick={handleSearch} className='bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-8 rounded-xl text-base transition shadow-md'>
-            {String.fromCodePoint(0x1f382)} {'\u67e5\u770b'}{city.name}{'\u524d3\u540d\u9152\u5e97\u7684\u751f\u65e5\u4e5d\u6298\u5238'}
-          </button>
-          <p className='text-xs text-gray-400 mt-3'>{'\u7cfb\u7edf\u5c06\u81ea\u52a8\u641c\u7d22\u5e76\u68c0\u67e5\u6700\u591a3\u5bb6\u9152\u5e97\u662f\u5426\u652f\u6301\u751f\u65e5\u4e5d\u6298\u5238'}</p>
-        </div>
-      )}
-
-      {loading && (
+      {loading && !searched && (
         <div className='flex items-center justify-center py-8'>
           <div className='animate-spin rounded-full h-6 w-6 border-2 border-pink-500 border-t-transparent' />
           <span className='ml-2 text-sm text-gray-500'>{'\u6b63\u5728\u641c\u7d22\u5e76\u67e5\u8be2\u751f\u65e5\u4f18\u60e0...'}</span>
@@ -116,7 +115,6 @@ export default function BirthdaySearch({ city, onViewAllCoupons, onBack }: Birth
                 </div>
               </div>
 
-              {/* Birthday coupon details */}
               {hotel.birthdayCoupons.length > 0 && (
                 <div className='mt-2 pt-2 border-t border-gray-100'>
                   {hotel.birthdayCoupons.map((c, i) => (
@@ -134,7 +132,7 @@ export default function BirthdaySearch({ city, onViewAllCoupons, onBack }: Birth
             </div>
           ))}
 
-          <button onClick={handleSearch} className='w-full text-sm text-pink-500 hover:text-pink-700 py-2 border border-dashed border-gray-300 rounded-lg'>{'\ud83d\udd04 \u91cd\u65b0\u641c\u7d22'}</button>
+          <button onClick={handleSearch} className='w-full text-sm text-pink-500 hover:text-pink-700 py-2 border border-dashed border-gray-300 rounded-lg'>{String.fromCodePoint(0x1f504) + ' \u91cd\u65b0\u641c\u7d22'}</button>
 
           <JsonViewer data={rawData} title={'\u641c\u7d22\u54cd\u5e94'} buttonLabel={'\u25b6 JSON'} />
         </div>

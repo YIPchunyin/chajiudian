@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 interface BirthdayCoupon {
   name: string;
@@ -37,7 +37,7 @@ const COUPON_TYPE_LABELS: Record<number, string> = {
 };
 
 function is90PercentCoupon(coupon: BirthdayCoupon): boolean {
-  return (coupon.couponName?.indexOf('\u0039\u6298') ?? -1) !== -1 || (coupon.couponText?.indexOf('\u0039\u6298') ?? -1) !== -1;
+  return (coupon.name?.indexOf('\u0039\u6298') ?? -1) !== -1 || (coupon.couponText?.indexOf('\u0039\u6298') ?? -1) !== -1;
 }
 
 export default function BirthdayBenefit({ data, hotelName, onViewAllCoupons, onBack }: BirthdayBenefitProps) {
@@ -134,7 +134,7 @@ function NineDiscountCard({ coupon }: { coupon: BirthdayCoupon }) {
         </div>
         <div className='flex items-start justify-between'>
           <div>
-            <div className='font-bold text-gray-800 text-base'>{coupon.couponName}</div>
+            <div className='font-bold text-gray-800 text-base'>{coupon.name}</div>
             <div className='text-3xl font-extrabold mt-1 text-red-500 tracking-tight'>{coupon.couponText}</div>
             {coupon.savings !== undefined && coupon.savings > 0 && (
               <div className='text-base font-semibold text-green-600 mt-1'>{'\u9884\u8ba1\u8282\u7701'} \u00a5{coupon.savings}</div>
