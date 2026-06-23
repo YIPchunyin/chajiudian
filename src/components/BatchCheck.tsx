@@ -1,59 +1,99 @@
 ﻿'use client';
 
-import { useState } from 'react';
-import JsonViewer from '@/components/JsonViewer';
+import { useState, useRef, useCallback } from 'react';
 
-interface BatchResult {
+interface ProgressItem {
   hotelName: string;
-  source: 'cache' | 'search';
-  found: boolean;
   has90Percent: boolean;
   canUse90Percent: boolean;
-  details: string;
+  source: string;
+}
+
+interface ProgressData {
+  type: 'init' | 'progress' | 'done' | 'error';
+  processed?: number;
+  total?: number;
+  currentHotel?: string;
+  canUse90Percent?: boolean;
+  has90Percent?: boolean;
+  source?: string;
+  details?: string;
+  cacheHits?: number;
+  searchHits?: number;
+  canUseCount?: number;
+  recent10?: ProgressItem[];
+  message?: string;
 }
 
 export default function BatchCheck() {
   const [input, setInput] = useState('');
-  const [results, setResults] = useState<BatchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [rawData, setRawData] = useState<unknown>(null);
-  const [error, setError] = useState('');
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [progress, setProgress] = useState<ProgressData | null>(null);
+  const [recent10, setRecent10] = useState<ProgressItem[]>([]);
+  const [processed, setProcessed] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [cacheHits, setCacheHits] = useState(0);
+  const [searchHits, setSearchHits] = useState(0);
+  const [canUseCount, setCanUseCount] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const [checkIn, setCheckIn] = useState('2026-07-01');
+  const [checkOut, setCheckOut] = useState('2026-07-02');
 
-  const handleCheck = async () => {
+  const handleCheck = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
+    const names = text.split(',').map((s) => s.trim()).filter(Boolean);
+    if (names.length === 0) return;
 
-    const hotelNames = text.split(',').map((s) => s.trim()).filter(Boolean);
-    if (hotelNames.length === 0) return;
+    setRunning(true); setDone(false); setProgress(null);
+    setRecent10([]); setProcessed(0); setTotal(names.length);
+    setCacheHits(0); setSearchHits(0); setCanUseCount(0);
 
-    setLoading(true);
-    setResults([]);
-    setRawData(null);
-    setError('');
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     try {
-      const res = await fetch('/api/hotel/batch-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hotels: hotelNames }),
-      });
-      const json = await res.json();
-      setRawData(json);
-      if (json.success) {
-        setResults(json.data || []);
-      } else {
-        setError(json.error || '\u8bf7\u6c42\u5931\u8d25');
+      const res = await fetch('/api/hotel/batch-progress?names=' + encodeURIComponent(names.join(',')) + '&checkIn=' + checkIn + '&checkOut=' + checkOut, { signal: abort.signal });
+      const reader = res.body?.getReader();
+      if (!reader) { setProgress({ type: 'error', message: '\u65e0\u6cd5\u8bfb\u53d6\u54cd\u5e94\u6d41' }); setRunning(false); return; }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data: ProgressData = JSON.parse(line.substring(6));
+              setProgress(data);
+              if (data.type === 'progress') {
+                setProcessed(data.processed || 0);
+                setTotal(data.total || 0);
+                setCacheHits(data.cacheHits || 0);
+                setSearchHits(data.searchHits || 0);
+                setCanUseCount(data.canUseCount || 0);
+                if (data.recent10) setRecent10([...data.recent10]);
+              } else if (data.type === 'done') {
+                setDone(true); setRunning(false);
+                setCacheHits(data.cacheHits || 0);
+                setSearchHits(data.searchHits || 0);
+                setCanUseCount(data.canUseCount || 0);
+              } else if (data.type === 'error') { setRunning(false); }
+            } catch { }
+          }
+        }
       }
     } catch (e: any) {
-      setError(e.message || '\u7f51\u7edc\u9519\u8bef');
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (e.name !== 'AbortError') setProgress({ type: 'error', message: e.message || '\u8bf7\u6c42\u5931\u8d25' });
+    } finally { setRunning(false); abortRef.current = null; }
+  }, [input, checkIn, checkOut]);
 
-  const cacheCount = results.filter((r) => r.source === 'cache').length;
-  const searchCount = results.filter((r) => r.source === 'search').length;
-  const canUseCount = results.filter((r) => r.canUse90Percent).length;
+  const handleStop = useCallback(() => { abortRef.current?.abort(); setRunning(false); }, []);
 
   return (
     <div className="space-y-4">
@@ -62,86 +102,75 @@ export default function BatchCheck() {
           <span>{String.fromCodePoint(0x1f50d)}</span>
           <span>{'\u6279\u91cf\u67e5\u8be2\u9152\u5e97\u4e5d\u6298\u5238'}</span>
         </h2>
-        <p className="text-xs text-gray-400 mb-4">
-          {'\u8f93\u5165\u9152\u5e97\u540d\u79f0\uff0c\u7528\u9017\u53f7\u5206\u9694\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u68c0\u7d22\u7f13\u5b58\u6216\u901a\u8fc7\u7f51\u7ad9\u67e5\u8be2'}
-        </p>
-        <textarea
-          className="w-full border rounded-lg px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-          rows={4}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={'\u4f8b\u5982: \u6c49\u5ead\u5317\u4eac\u5929\u5b89\u95e8\u9152\u5e97,\u5168\u5b63\u4e0a\u6d77\u5357\u4eac\u8def\u9152\u5e97,\u6854\u5b50\u9152\u5e97\u6df1\u5733'}
-        />
-        <button
-          onClick={handleCheck}
-          disabled={loading}
-          className="mt-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm"
-        >
-          {loading ? String.fromCodePoint(0x23f3) + ' \u67e5\u8be2\u4e2d...' : String.fromCodePoint(0x1f50d) + ' \u67e5\u8be2\u4e5d\u6298\u5238'}
-        </button>
+        <p className="text-xs text-gray-400 mb-4">{'\u8f93\u5165\u9152\u5e97\u540d\u79f0\uff0c\u7528\u9017\u53f7\u5206\u9694\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u68c0\u7d22\u7f13\u5b58\u6216\u901a\u8fc7\u7f51\u7ad9\u67e5\u8be2'}</p>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div><label className="block text-sm font-medium text-gray-600 mb-1">{'\u5165\u4f4f'}</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} disabled={running} /></div>
+          <div><label className="block text-sm font-medium text-gray-600 mb-1">{'\u79bb\u5e97'}</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} disabled={running} /></div>
+        </div>
+
+        <textarea className="w-full border rounded-lg px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent" rows={4} value={input} onChange={(e) => setInput(e.target.value)} placeholder={'\u4f8b\u5982: \u6c49\u5ead\u5317\u4eac\u5929\u5b89\u95e8,\u5168\u5b63\u4e0a\u6d77\u5357\u4eac\u8def,\u6854\u5b50\u9152\u5e97\u6df1\u5733'} disabled={running} />
+
+        <div className="flex gap-2 mt-3">
+          <button onClick={handleCheck} disabled={running || !input.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
+            {running ? String.fromCodePoint(0x23f3) + ' \u5904\u7406\u4e2d...' : String.fromCodePoint(0x1f50d) + ' \u67e5\u8be2\u4e5d\u6298\u5238'}
+          </button>
+          {running && <button onClick={handleStop} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">{String.fromCodePoint(0x26a0)} \u505c\u6b62</button>}
+        </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">{'\u274c'} {error}</div>
-      )}
-
-      {results.length > 0 && (
+      {(running || done) && (
         <div className="bg-white rounded-xl shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-800">{'\u67e5\u8be2\u7ed3\u679c'}</h3>
-            <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded">{cacheCount} {'\u7f13\u5b58'}</span>
-              <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded">{searchCount} {'\u722c\u866b'}</span>
-              <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded">{canUseCount} {'\u53ef\u7528'}</span>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={'rounded-lg px-3 py-1.5 text-sm font-medium ' + (done ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700')}>
+              {done ? '\u2705 \u5df2\u5b8c\u6210' : '\u23f3 \u5904\u7406\u4e2d...'}
             </div>
+            <div className="text-xs text-gray-400">{processed}/{total}</div>
           </div>
-          <div className="space-y-2">
-            {results.map((r, idx) => (
-              <div
-                key={idx}
-                className={
-                  'flex items-center justify-between rounded-lg px-4 py-3 text-sm border ' +
-                  (r.canUse90Percent
-                    ? 'border-green-300 bg-green-50'
-                    : r.found
-                      ? 'border-gray-200 bg-white'
-                      : 'border-gray-100 bg-gray-50')
-                }
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <div className="font-medium text-gray-800">{r.hotelName}</div>
-                    <div className="text-xs text-gray-400">
-                      {r.source === 'cache'
-                        ? String.fromCodePoint(0x1f4be) + ' \u7f13\u5b58'
-                        : String.fromCodePoint(0x1f4e1) + ' \u5b9e\u65f6\u67e5\u8be2'}
+
+          {total > 0 && (
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: Math.min(100, (processed / total) * 100) + '%' }} />
+            </div>
+          )}
+
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="bg-blue-50 rounded p-2 text-center"><div className="text-lg font-bold text-blue-600">{processed}</div><div className="text-xs text-blue-500">已处理</div></div>
+            <div className="bg-purple-50 rounded p-2 text-center"><div className="text-lg font-bold text-purple-600">{cacheHits}</div><div className="text-xs text-purple-500">缓存</div></div>
+            <div className="bg-orange-50 rounded p-2 text-center"><div className="text-lg font-bold text-orange-600">{searchHits}</div><div className="text-xs text-orange-500">爬虫</div></div>
+            <div className="bg-green-50 rounded p-2 text-center"><div className="text-lg font-bold text-green-600">{canUseCount}</div><div className="text-xs text-green-500">九折可用</div></div>
+          </div>
+
+          {progress?.currentHotel && (
+            <div className="text-sm text-gray-500 mb-3">当前：<span className="font-semibold text-gray-700">{progress.currentHotel}</span></div>
+          )}
+
+          {recent10.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">最近 {recent10.length} 条：</h3>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {[...recent10].reverse().map((h, i) => (
+                  <div key={i} className={'flex items-center justify-between rounded-lg px-3 py-2 text-sm ' + (
+                    h.canUse90Percent ? 'bg-green-50 border border-green-200' :
+                    h.has90Percent ? 'bg-yellow-50 border border-yellow-200' :
+                    'bg-gray-50 border border-gray-100'
+                  )}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xs text-gray-400 shrink-0">{h.source === 'cache' ? '\u{1f4be}' : '\u{1f4e1}'}</span>
+                      <span className="text-gray-700 font-medium truncate">{h.hotelName}</span>
                     </div>
+                    <span className={'shrink-0 ml-2 text-xs font-bold px-2 py-0.5 rounded-full ' + (
+                      h.canUse90Percent ? 'bg-green-500 text-white' :
+                      h.has90Percent ? 'bg-yellow-400 text-yellow-900' :
+                      'bg-gray-300 text-gray-600'
+                    )}>
+                      {h.canUse90Percent ? '\u2705 \u53ef\u7528' : h.has90Percent ? '\u274c \u4e0d\u53ef\u7528' : '\u26aa \u65e0'}
+                    </span>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  {r.canUse90Percent ? (
-                    <span className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                      {'\u2705 \u4e5d\u6298\u53ef\u7528'}
-                    </span>
-                  ) : r.has90Percent ? (
-                    <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1.5 rounded-full">
-                      {'\u274c \u4e5d\u6298\u4e0d\u53ef\u7528'}
-                    </span>
-                  ) : (
-                    <span className="bg-gray-200 text-gray-500 text-xs px-3 py-1.5 rounded-full">
-                      {r.found ? '\u26aa \u65e0\u4e5d\u6298\u5238' : '\u26aa \u672a\u627e\u5230'}
-                    </span>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="mt-4">
-            <JsonViewer data={rawData} title={'\u54cd\u5e94\u6570\u636e'} buttonLabel={'\u25b6 \u67e5\u770bJSON'} />
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
