@@ -26,7 +26,7 @@ export default function FileCheck() {
   const [checkOut, setCheckOut] = useState('2026-07-02');
   const abortRef = useRef<AbortController | null>(null);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (!file) { setError('\u8bf7\u9009\u62e9\u6587\u4ef6'); return; }
     setError(''); setRunning(true); setDone(false);
     setRecent10([]); setProcessed(0); setTotal(0);
@@ -92,7 +92,7 @@ export default function FileCheck() {
     } catch (e: any) {
       if (e.name !== 'AbortError') setError(e.message || '\u8bf7\u6c42\u5931\u8d25');
     } finally { setRunning(false); abortRef.current = null; }
-  }, [file, columnName, checkIn, checkOut]);
+  }
 
   return (
     <div className="space-y-4">
@@ -154,7 +154,7 @@ export default function FileCheck() {
                     'bg-gray-50 border border-gray-100'
                   )}>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-xs text-gray-400 shrink-0">{h.source === 'cache' ? '\u{1f4be}' : '\u{1f4e1}'}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{h.source === 'cache' ? String.fromCodePoint(0x1f4be) : String.fromCodePoint(0x1f4e1)}</span>
                       <span className="text-gray-700 font-medium truncate">{h.hotelName}</span>
                     </div>
                     <span className={'shrink-0 ml-2 text-xs font-bold px-2 py-0.5 rounded-full ' + (

@@ -1,4 +1,4 @@
-﻿import { checkHotelBirthday, makeHeaders } from '@/lib/huazhu';
+﻿import { checkHotelBirthday, makeHeaders, searchAndCheckBirthday } from '@/lib/huazhu';
 import { findCachedHotel, saveHotelCache } from '@/lib/mongodb';
 
 function sseEvent(data: any): string {
@@ -27,89 +27,55 @@ export async function GET(request: Request) {
       let canUseCount = 0;
       const recent10: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean; source: string }> = [];
 
-      controller.enqueue(sseEvent({
-        type: 'init',
-        total: hotelNames.length,
-        message: '\u5f00\u59cb\u5904\u7406 ' + hotelNames.length + ' \u5bb6\u9152\u5e97',
-      }));
+      controller.enqueue(sseEvent({ type: 'init', total: hotelNames.length, message: '\u5f00\u59cb\u5904\u7406 ' + hotelNames.length + ' \u5bb6\u9152\u5e97' }));
 
       for (const hotelName of hotelNames) {
-        let result: { has90Percent: boolean; canUse90Percent: boolean; found: boolean; source: string; details: string };
+        let has90 = false, canUse = false, found = false, source = 'search';
 
         // Check cache
         const cached = await findCachedHotel(hotelName);
         if (cached) {
           cacheHits++;
-          result = {
-            has90Percent: cached.has90Percent,
-            canUse90Percent: cached.canUse90Percent,
-            found: true,
-            source: 'cache',
-            details: cached.has90Percent ? (cached.canUse90Percent ? '\u2705 \u4e5d\u6298\u5238\u53ef\u7528' : '\u274c \u4e5d\u6298\u5238\u4e0d\u53ef\u7528') : '\u26aa \u65e0\u4e5d\u6298',
-          };
+          has90 = cached.has90Percent;
+          canUse = cached.canUse90Percent;
+          found = true;
+          source = 'cache';
         } else {
           // Search via API
           try {
-            const searchResults = await import('@/lib/huazhu').then((m) => m.searchAndCheckBirthday(hotelName, checkIn, checkOut));
+            const searchResults = await searchAndCheckBirthday(hotelName, checkIn, checkOut);
             const match = searchResults.find(
-              (r: any) => r.hotelName.indexOf(hotelName) !== -1 || hotelName.indexOf(r.hotelName) !== -1
+              (r) => r.hotelName.indexOf(hotelName) !== -1 || hotelName.indexOf(r.hotelName) !== -1
             );
             if (match) {
               searchHits++;
+              has90 = match.has90Percent;
+              canUse = match.canUse90Percent;
+              found = true;
               await saveHotelCache({
-                hotelName,
-                hotelId: match.hotelId,
+                hotelName, hotelId: match.hotelId,
                 queryDate: new Date().toISOString().split('T')[0],
-                has90Percent: match.has90Percent,
-                canUse90Percent: match.canUse90Percent,
+                has90Percent: has90, canUse90Percent: canUse,
                 allCoupons: JSON.stringify(match.birthdayCoupons),
                 updatedAt: new Date(),
               });
-              result = {
-                has90Percent: match.has90Percent,
-                canUse90Percent: match.canUse90Percent,
-                found: true,
-                source: 'search',
-                details: match.has90Percent ? (match.canUse90Percent ? '\u2705 \u4e5d\u6298\u5238\u53ef\u7528' : '\u274c \u4e5d\u6298\u5238\u4e0d\u53ef\u7528') : '\u26aa \u65e0\u4e5d\u6298',
-              };
-            } else {
-              result = { has90Percent: false, canUse90Percent: false, found: false, source: 'search', details: '\u26aa \u672a\u627e\u5230' };
             }
-          } catch {
-            result = { has90Percent: false, canUse90Percent: false, found: false, source: 'search', details: '\u274c \u67e5\u8be2\u5931\u8d25' };
-          }
+          } catch { }
         }
 
         processed++;
-        if (result.canUse90Percent) canUseCount++;
-        recent10.push({ hotelName, has90Percent: result.has90Percent, canUse90Percent: result.canUse90Percent, source: result.source });
+        if (canUse) canUseCount++;
+        recent10.push({ hotelName, has90Percent: has90, canUse90Percent: canUse, source });
         if (recent10.length > 10) recent10.shift();
 
         controller.enqueue(sseEvent({
-          type: 'progress',
-          processed,
-          total: hotelNames.length,
-          currentHotel: hotelName,
-          canUse90Percent: result.canUse90Percent,
-          has90Percent: result.has90Percent,
-          source: result.source,
-          details: result.details,
-          cacheHits,
-          searchHits,
-          canUseCount,
+          type: 'progress', processed, total: hotelNames.length,
+          currentHotel: hotelName, cacheHits, searchHits, canUseCount,
           recent10: [...recent10],
         }));
       }
 
-      controller.enqueue(sseEvent({
-        type: 'done',
-        processed,
-        total: hotelNames.length,
-        cacheHits,
-        searchHits,
-        canUseCount,
-        message: '\u5904\u7406\u5b8c\u6210\uff01\u5171 ' + processed + ' \u5bb6\uff0c\u7f13\u5b58 ' + cacheHits + ' \u5bb6\uff0c\u722c\u866b ' + searchHits + ' \u5bb6\uff0c' + canUseCount + ' \u5bb6\u53ef\u7528\u4e5d\u6298',
-      }));
+      controller.enqueue(sseEvent({ type: 'done', processed, total: hotelNames.length, cacheHits, searchHits, canUseCount, message: '\u5904\u7406\u5b8c\u6210' }));
       controller.close();
     },
   });

@@ -1,6 +1,15 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
+interface StoredFile {
+  data: Record<string, any>[];
+  matchedColumn: string;
+  headers: string[];
+  columnName: string;
+}
+
+const fileStore = new Map<string, StoredFile>();
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -30,11 +39,8 @@ export async function POST(request: NextRequest) {
 
     const hotelNames = [...new Set(data.map((row) => String(row[matchedColumn]).trim()).filter(Boolean))];
 
-    // Store original data in memory with a simple key
     const fileKey = 'file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-    const store: any = (global as any).__fileStore || {};
-    store[fileKey] = { data, matchedColumn, headers, columnName };
-    (global as any).__fileStore = store;
+    fileStore.set(fileKey, { data, matchedColumn, headers, columnName });
 
     return NextResponse.json({
       success: true,
@@ -49,3 +55,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+
+export { fileStore };

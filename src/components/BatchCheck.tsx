@@ -40,7 +40,7 @@ export default function BatchCheck() {
   const [checkIn, setCheckIn] = useState('2026-07-01');
   const [checkOut, setCheckOut] = useState('2026-07-02');
 
-  const handleCheck = useCallback(async () => {
+  const handleCheck = async () => {
     const text = input.trim();
     if (!text) return;
     const names = text.split(',').map((s) => s.trim()).filter(Boolean);
@@ -91,7 +91,7 @@ export default function BatchCheck() {
     } catch (e: any) {
       if (e.name !== 'AbortError') setProgress({ type: 'error', message: e.message || '\u8bf7\u6c42\u5931\u8d25' });
     } finally { setRunning(false); abortRef.current = null; }
-  }, [input, checkIn, checkOut]);
+  }
 
   const handleStop = useCallback(() => { abortRef.current?.abort(); setRunning(false); }, []);
 
@@ -156,7 +156,7 @@ export default function BatchCheck() {
                     'bg-gray-50 border border-gray-100'
                   )}>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-xs text-gray-400 shrink-0">{h.source === 'cache' ? '\u{1f4be}' : '\u{1f4e1}'}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{h.source === 'cache' ? String.fromCodePoint(0x1f4be) : String.fromCodePoint(0x1f4e1)}</span>
                       <span className="text-gray-700 font-medium truncate">{h.hotelName}</span>
                     </div>
                     <span className={'shrink-0 ml-2 text-xs font-bold px-2 py-0.5 rounded-full ' + (
