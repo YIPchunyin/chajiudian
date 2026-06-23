@@ -5,6 +5,7 @@ import type { HotelRequest, HotelResponse } from '@/types/hotel';
 import BirthdaySearch from '@/components/BirthdaySearch';
 import ApiTester from '@/components/ApiTester';
 import BatchCheck from '@/components/BatchCheck';
+import FileCheck from '@/components/FileCheck';
 import JsonViewer from '@/components/JsonViewer';
 
 const DEFAULT_FORM: HotelRequest = {
@@ -32,7 +33,7 @@ const COUPON_TYPE_LABELS: Record<number, string> = {
 type Step = 'search' | 'birthday' | 'coupon';
 
 export default function Home() {
-  const [mode, setMode] = useState<'coupon' | 'api' | 'batch'>('coupon');
+  const [mode, setMode] = useState<'coupon' | 'api' | 'batch' | 'file'>('coupon');
   const [step, setStep] = useState<Step>('search');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -92,9 +93,9 @@ export default function Home() {
     }
   };
 
-  const switchMode = (newMode: 'coupon' | 'api' | 'batch') => {
+  const switchMode = (newMode: 'coupon' | 'api' | 'batch' | 'file') => {
     setMode(newMode);
-    if (newMode === 'api') return;
+    if (newMode === 'api' || newMode === 'file') return;
     setStep('search');
     setSearchKeyword('');
     setSearchHotelId(null);
@@ -130,20 +131,14 @@ export default function Home() {
             <h1 className='text-3xl font-bold text-gray-800'>{String.fromCodePoint(0x1f3f7)} {'\u534e\u4f4f\u9152\u5e97\u4f18\u60e0\u5238\u722c\u866b'}</h1>
           </div>
           <div className='flex gap-1 bg-gray-200 rounded-lg p-1'>
-            <button
-              onClick={() => switchMode('coupon')}
-              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-            >{String.fromCodePoint(0x1f382)} {'\u641c\u7d22'}</button>
-            <button
-              onClick={() => switchMode('batch')}
-              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'batch' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-            >{String.fromCodePoint(0x1f4ca)} {'\u6279\u91cf'}</button>
-            <button
-              onClick={() => switchMode('api')}
-              className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-            >{String.fromCodePoint(0x1f4e1)} API</button>
+            <button onClick={() => switchMode('coupon')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f382)} {'\u641c\u7d22'}</button>
+            <button onClick={() => switchMode('batch')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'batch' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4ca)} {'\u6279\u91cf'}</button>
+            <button onClick={() => switchMode('file')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4c4)} {'\u8868\u683c'}</button>
+            <button onClick={() => switchMode('api')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} API</button>
           </div>
         </div>
+
+        {mode === 'file' && <FileCheck />}
 
         {mode === 'batch' && <BatchCheck />}
 
@@ -165,14 +160,7 @@ export default function Home() {
               <div className='bg-white rounded-xl shadow p-6 mb-6'>
                 <h2 className='text-lg font-bold text-gray-800 mb-4'>{'\u641c\u7d22\u9152\u5e97'}</h2>
                 <div className='flex gap-2'>
-                  <input
-                    type='text'
-                    className='flex-1 border rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent'
-                    placeholder={'\u8f93\u5165\u9152\u5e97\u540d\u79f0\u6216\u57ce\u5e02\u5173\u952e\u8bcd...'}
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                  />
+                  <input type='text' className='flex-1 border rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent' placeholder={'\u8f93\u5165\u9152\u5e97\u540d\u79f0\u6216\u57ce\u5e02\u5173\u952e\u8bcd...'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} />
                   <button onClick={handleSearch} className='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm'>{String.fromCodePoint(0x1f50d)} {'\u641c\u7d22'}</button>
                 </div>
               </div>
@@ -185,8 +173,7 @@ export default function Home() {
             {step === 'coupon' && searchHotelId && (
               <>
                 <div className='bg-white rounded-lg shadow-sm border p-3 mb-4 flex items-center gap-3 text-sm flex-wrap'>
-                  <span className='text-gray-500'>{'\u9152\u5e97'}:</span>
-                  <span className='font-medium text-gray-800'>{searchHotelName}</span>
+                  <span className='text-gray-500'>{'\u9152\u5e97'}:</span><span className='font-medium text-gray-800'>{searchHotelName}</span>
                   <button onClick={handleBack} className='text-blue-500 hover:text-blue-700 ml-auto'>{'\u2190 \u8fd4\u56de\u641c\u7d22'}</button>
                 </div>
 
@@ -211,36 +198,9 @@ export default function Home() {
                   <>
                     <div className='max-w-5xl mx-auto mb-4'><JsonViewer data={result} title={'\u4f18\u60e0\u5238\u54cd\u5e94\u6570\u636e'} buttonLabel={'\u25b6 \u67e5\u770bJSON'} /></div>
                     <div className='space-y-6'>
-                      {result.content.benefitGroupList.length > 0 && (
-                        <div className='bg-white rounded-xl shadow p-6'>
-                          <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f3ab)} {'\u6743\u76ca\u5238'}</h2>
-                          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                            {result.content.benefitGroupList.map((g: any, i: number) => (
-                              <div key={i} className='flex items-center gap-3 border rounded-lg p-3'>
-                                <img src={g.icon} alt={g.name} className='w-10 h-10' />
-                                <div><div className='font-medium'>{g.name}</div><div className='text-sm text-gray-500'>{'\u53ef\u7528\u6b21\u6570'}: {g.canUseCount} / {g.useMaxLimit}</div></div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {result.content.couponList && Object.keys(result.content.couponList).length > 0 && (
-                        <div className='bg-white rounded-xl shadow p-6'>
-                          <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f39f)} {'\u53ef\u7528\u4f18\u60e0\u5238'}</h2>
-                          {Object.entries(result.content.couponList).map(([date, coupons]: [string, any]) => (
-                            <div key={date} className='mb-4'>
-                              <h3 className='text-sm font-semibold text-gray-500 mb-2'>{String.fromCodePoint(0x1f4c5)} {date}</h3>
-                              <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{(coupons as any[]).map((c: any, i: number) => renderCoupon(c, i))}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {result.content.thresholdList.length > 0 && (
-                        <div className='bg-white rounded-xl shadow p-6'>
-                          <h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f4cc)} {'\u95e8\u69db\u5238'}</h2>
-                          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{result.content.thresholdList.map((c: any, i: number) => renderCoupon(c, i))}</div>
-                        </div>
-                      )}
+                      {result.content.benefitGroupList.length > 0 && (<div className='bg-white rounded-xl shadow p-6'><h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f3ab)} {'\u6743\u76ca\u5238'}</h2><div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{result.content.benefitGroupList.map((g: any, i: number) => (<div key={i} className='flex items-center gap-3 border rounded-lg p-3'><img src={g.icon} alt={g.name} className='w-10 h-10' /><div><div className='font-medium'>{g.name}</div><div className='text-sm text-gray-500'>{'\u53ef\u7528\u6b21\u6570'}: {g.canUseCount} / {g.useMaxLimit}</div></div></div>))}</div></div>)}
+                      {result.content.couponList && Object.keys(result.content.couponList).length > 0 && (<div className='bg-white rounded-xl shadow p-6'><h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f39f)} {'\u53ef\u7528\u4f18\u60e0\u5238'}</h2>{Object.entries(result.content.couponList).map(([date, coupons]: [string, any]) => (<div key={date} className='mb-4'><h3 className='text-sm font-semibold text-gray-500 mb-2'>{String.fromCodePoint(0x1f4c5)} {date}</h3><div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{(coupons as any[]).map((c: any, i: number) => renderCoupon(c, i))}</div></div>))}</div>)}
+                      {result.content.thresholdList.length > 0 && (<div className='bg-white rounded-xl shadow p-6'><h2 className='text-lg font-bold text-gray-800 mb-4'>{String.fromCodePoint(0x1f4cc)} {'\u95e8\u69db\u5238'}</h2><div className='grid grid-cols-1 md:grid-cols-2 gap-3'>{result.content.thresholdList.map((c: any, i: number) => renderCoupon(c, i))}</div></div>)}
                     </div>
                   </>
                 )}
