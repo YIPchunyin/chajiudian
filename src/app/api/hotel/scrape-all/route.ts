@@ -1,5 +1,5 @@
 ﻿import { makeHeaders, checkHotelBirthday } from '@/lib/huazhu';
-import { saveHotelCache } from '@/lib/mongodb';
+import { findCachedHotel, saveHotelCache } from '@/lib/mongodb';
 
 function sseEvent(data: any): string {
   return 'data: ' + JSON.stringify(data) + '\n\n';
@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       const contentHeaders = { ...Object.fromEntries(h.entries()), 'Content-Type': 'application/json' };
 
       let processed = 0;
+      let cacheHits = 0;
       const recent5: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }> = [];
       let totalCities = 0;
       let processedCities = 0;
@@ -132,12 +133,12 @@ export async function GET(request: Request) {
           controller.enqueue(sseEvent({
             type: 'progress', processed, totalHotels: totalCities,
             currentCity: city.name, cityProgress: processedCities + '/' + totalCities,
-            recent5: [...recent5],
+            recent5: [...recent5], cacheHits
           }));
         }));
       }
 
-      controller.enqueue(sseEvent({ type: 'done', message: '\u722c\u53d6\u5b8c\u6210\uff01\u5171\u5904\u7406 ' + processed + ' \u5bb6\u9152\u5e97', totalHotels: totalCities, processed }));
+      controller.enqueue(sseEvent({ type: 'done', message: '\u722c\u53d6\u5b8c\u6210\uff01\u5171\u5904\u7406 ' + processed + ' \u5bb6\u9152\u5e97', totalHotels: totalCities, processed, cacheHits }));
       controller.close();
     },
   });

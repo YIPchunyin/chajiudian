@@ -12,14 +12,14 @@ interface ProgressEvent {
   cityProgress?: string;
   canUse90Percent?: boolean;
   has90Percent?: boolean;
-  recent5?: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>;
+  recent5?: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>;  cacheHits?: number;
 }
 
 export default function ScrapeAll() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [recent5, setRecent5] = useState<Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>>([]);
-  const [processed, setProcessed] = useState(0);
+  const [processed, setProcessed] = useState(0);  const [cacheHits, setCacheHits] = useState(0);
   const [total, setTotal] = useState<number | string>('?');
   const [currentCity, setCurrentCity] = useState('');
   const [cityProgress, setCityProgress] = useState('');
@@ -30,7 +30,7 @@ export default function ScrapeAll() {
 
   const handleStart = useCallback(async () => {
     setRunning(true); setDone(false); setProgress(null);
-    setRecent5([]); setProcessed(0); setTotal('?');
+    setRecent5([]); setProcessed(0); setCacheHits(0); setTotal('?');
     setCurrentCity(''); setCityProgress('');
 
     const abort = new AbortController();
@@ -56,12 +56,13 @@ export default function ScrapeAll() {
               setProgress(data);
               if (data.type === 'progress') {
                 setProcessed(data.processed || 0);
+                if (data.cacheHits !== undefined) setCacheHits(data.cacheHits);
                 if (data.recent5) setRecent5([...data.recent5]);
                 if (data.totalHotels) setTotal(data.totalHotels);
                 if (data.currentCity) setCurrentCity(data.currentCity);
                 if (data.cityProgress) setCityProgress(data.cityProgress);
               } else if (data.type === 'total' && data.totalHotels) { setTotal(data.totalHotels); }
-              else if (data.type === 'done') { setDone(true); setRunning(false); }
+              else if (data.type === 'done') { setDone(true); setRunning(false); if (data.cacheHits !== undefined) setCacheHits(data.cacheHits); }
               else if (data.type === 'error') { setRunning(false); }
             } catch { }
           }
@@ -103,7 +104,7 @@ export default function ScrapeAll() {
             {progress.type === 'progress' && !done && '\u23f3 ' + (progress.message || '正在爬取...')}
             {progress.type === 'total' && '\u2139 ' + (progress.message || '')}
           </div>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-4 gap-3 mb-4">
             <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-600">{processed}</div><div className="text-xs text-blue-500">酒店</div></div>
             <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-purple-600">{total}</div><div className="text-xs text-purple-500">城市</div></div>
             <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-green-600">{cityProgress || '...'}</div><div className="text-xs text-green-500">进度</div></div>
