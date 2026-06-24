@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   const checkIn = url.searchParams.get('checkIn') || '2026-07-01';
   const checkOut = url.searchParams.get('checkOut') || '2026-07-02';
   const resume = url.searchParams.get('resume') === 'true';
+  const reverse = url.searchParams.get('reverse') === 'true';
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
       let searchedNames = new Set<string>();
       let startIndex = 0;
       let completedNames: string[] = [];
+      let direction = reverse;
 
       const hotelListBodyBase: any = {
         poiId: '', pageSize: 100, pageIndex: 1, pageSource: 'hotelList',
@@ -50,12 +52,14 @@ export async function GET(request: Request) {
           processed = saved.processed;
           cacheHits = saved.cacheHits;
           completedNames = saved.completedCityNames || [];
+          direction = saved.reverse;
           controller.enqueue(sseEvent({
             type: 'resume',
             message: '\u68c0\u6d4b\u5230\u672a\u5b8c\u6210\u7684\u722c\u53d6\u8fdb\u5ea6\uff0c\u4ece\u7b2c ' + (startIndex + 1) + ' \u4e2a\u57ce\u5e02\u7ee7\u7eed...',
             completedCityIndex: startIndex,
             processed,
             cacheHits,
+            reverse: direction,
           }));
         } else {
           controller.enqueue(sseEvent({ type: 'init', message: '\u672a\u627e\u5230\u4eca\u5929\u7684\u722c\u53d6\u8fdb\u5ea6\uff0c\u91cd\u65b0\u5f00\u59cb...' }));
@@ -87,7 +91,12 @@ export async function GET(request: Request) {
         controller.close(); return;
       }
 
-      controller.enqueue(sseEvent({ type: 'total', totalHotels: totalCities, message: '\u5171 ' + totalCities + ' \u4e2a\u57ce\u5e02' + (resume ? '\uff0c\u7ee7\u7eed\u5904\u7406\u4e2d...' : '\uff0c\u5e76\u884c\u5904\u7406\u4e2d...') }));
+      // Reverse cities if direction is reverse
+      if (direction) {
+        cities = cities.reverse();
+      }
+
+      controller.enqueue(sseEvent({ type: 'total', totalHotels: totalCities, message: '\u5171 ' + totalCities + ' \u4e2a\u57ce\u5e02' + (resume ? '\uff0c\u7ee7\u7eed\u5904\u7406\u4e2d...' : direction ? '\uff0c\u5012\u5e8f\u5904\u7406\u4e2d...' : '\uff0c\u5e76\u884c\u5904\u7406\u4e2d...') }));
 
       async function processCity(city: { id: string; name: string }): Promise<void> {
         const uuid = 'scrape-' + Date.now() + '-' + city.id;
@@ -172,6 +181,7 @@ export async function GET(request: Request) {
             processed,
             cacheHits,
             completedCityNames: completedNames,
+            reverse: direction,
             updatedAt: new Date(),
           };
           await saveScrapeProgress(progress);

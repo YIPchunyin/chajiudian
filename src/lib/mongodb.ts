@@ -50,6 +50,7 @@ export interface ScrapeProgress {
   processed: number;
   cacheHits: number;
   completedCityNames: string[];
+  reverse: boolean;
   updatedAt: Date;
 }
 
@@ -91,3 +92,4 @@ export async function saveHotelCache(record: ChajiudianRecord): Promise<void> {
     // silently fail - cache is non-critical
   }
 }
+
