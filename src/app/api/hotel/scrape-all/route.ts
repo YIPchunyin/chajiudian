@@ -1,5 +1,6 @@
 ﻿import { makeHeaders, checkHotelBirthday } from '@/lib/huazhu';
-import { findCachedHotel, saveHotelCache } from '@/lib/mongodb';
+import { findCachedHotel, saveHotelCache, getScrapeProgress, saveScrapeProgress, clearScrapeProgress } from '@/lib/mongodb';
+import type { ScrapeProgress } from '@/lib/mongodb';
 
 function sseEvent(data: any): string {
   return 'data: ' + JSON.stringify(data) + '\n\n';
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const checkIn = url.searchParams.get('checkIn') || '2026-07-01';
   const checkOut = url.searchParams.get('checkOut') || '2026-07-02';
+  const resume = url.searchParams.get('resume') === 'true';
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -27,6 +29,9 @@ export async function GET(request: Request) {
       let totalCities = 0;
       let processedCities = 0;
       let searchedNames = new Set<string>();
+      let startIndex = 0;
+      let completedNames: string[] = [];
+
       const hotelListBodyBase: any = {
         poiId: '', pageSize: 100, pageIndex: 1, pageSource: 'hotelList',
         newCurrentCityName: '', commitOrderServiceGroup: 'C',
@@ -37,7 +42,29 @@ export async function GET(request: Request) {
         uuid: 'scrape-' + Date.now(),
       };
 
-      controller.enqueue(sseEvent({ type: 'init', message: '\u83b7\u53d6\u57ce\u5e02\u5217\u8868...' }));
+      // Check for existing progress if resuming
+      if (resume) {
+        const saved = await getScrapeProgress();
+        if (saved) {
+          startIndex = saved.completedCityIndex;
+          processed = saved.processed;
+          cacheHits = saved.cacheHits;
+          completedNames = saved.completedCityNames || [];
+          controller.enqueue(sseEvent({
+            type: 'resume',
+            message: '\u68c0\u6d4b\u5230\u672a\u5b8c\u6210\u7684\u722c\u53d6\u8fdb\u5ea6\uff0c\u4ece\u7b2c ' + (startIndex + 1) + ' \u4e2a\u57ce\u5e02\u7ee7\u7eed...',
+            completedCityIndex: startIndex,
+            processed,
+            cacheHits,
+          }));
+        } else {
+          controller.enqueue(sseEvent({ type: 'init', message: '\u672a\u627e\u5230\u4eca\u5929\u7684\u722c\u53d6\u8fdb\u5ea6\uff0c\u91cd\u65b0\u5f00\u59cb...' }));
+        }
+      } else {
+        // Fresh start - clear old progress
+        await clearScrapeProgress();
+        controller.enqueue(sseEvent({ type: 'init', message: '\u83b7\u53d6\u57ce\u5e02\u5217\u8868...' }));
+      }
 
       // Fetch city list
       let cities: Array<{ id: string; name: string }> = [];
@@ -60,7 +87,7 @@ export async function GET(request: Request) {
         controller.close(); return;
       }
 
-      controller.enqueue(sseEvent({ type: 'total', totalHotels: totalCities, message: '\u5171 ' + totalCities + ' \u4e2a\u57ce\u5e02\uff0c\u5e76\u884c\u5904\u7406\u4e2d...' }));
+      controller.enqueue(sseEvent({ type: 'total', totalHotels: totalCities, message: '\u5171 ' + totalCities + ' \u4e2a\u57ce\u5e02' + (resume ? '\uff0c\u7ee7\u7eed\u5904\u7406\u4e2d...' : '\uff0c\u5e76\u884c\u5904\u7406\u4e2d...') }));
 
       async function processCity(city: { id: string; name: string }): Promise<void> {
         const uuid = 'scrape-' + Date.now() + '-' + city.id;
@@ -88,25 +115,30 @@ export async function GET(request: Request) {
           } catch { return []; }
         }
 
-        // Try getHotelList first (pages 1-3), then fallback to search
         let hotelItems: Array<{ id: string; name: string }> = [];
         for (let p = 1; p <= 3; p++) {
           const items = await tryGetHotelList(p);
           if (items.length > 0) hotelItems = hotelItems.concat(items);
-          if (items.length < 100) break; // last page
+          if (items.length < 100) break;
         }
+        if (hotelItems.length === 0) hotelItems = await trySearch();
 
-        if (hotelItems.length === 0) {
-          hotelItems = await trySearch();
-        }
-
-        // Deduplicate and process
         const seen = new Set<string>();
         for (const hotel of hotelItems) {
           if (!hotel.id || !hotel.name || seen.has(hotel.name)) continue;
           seen.add(hotel.name);
           if (searchedNames.has(hotel.name)) continue;
           searchedNames.add(hotel.name);
+
+          // Check cache first
+          const cached = await findCachedHotel(hotel.name);
+          if (cached && cached.queryDate === new Date().toISOString().split('T')[0]) {
+            cacheHits++;
+            processed++;
+            recent5.push({ hotelName: hotel.name, has90Percent: cached.has90Percent, canUse90Percent: cached.canUse90Percent });
+            if (recent5.length > 5) recent5.shift();
+            continue;
+          }
 
           const bc = await checkHotelBirthday(hotel.id, hotel.name, checkIn, checkOut, h);
           try {
@@ -124,21 +156,42 @@ export async function GET(request: Request) {
         }
       }
 
-      // Concurrent processing
-      for (let i = 0; i < cities.length; i += CONCURRENCY) {
+      // Process cities with concurrency - skip already completed cities
+      for (let i = startIndex; i < cities.length; i += CONCURRENCY) {
         const batch = cities.slice(i, i + CONCURRENCY);
         await Promise.all(batch.map(async (city) => {
           await processCity(city);
           processedCities++;
+          completedNames.push(city.name);
+
+          // Save progress to MongoDB after each city
+          const progress: ScrapeProgress = {
+            date: new Date().toISOString().split('T')[0],
+            completedCityIndex: startIndex + processedCities,
+            totalCities,
+            processed,
+            cacheHits,
+            completedCityNames: completedNames,
+            updatedAt: new Date(),
+          };
+          await saveScrapeProgress(progress);
+
           controller.enqueue(sseEvent({
             type: 'progress', processed, totalHotels: totalCities,
-            currentCity: city.name, cityProgress: processedCities + '/' + totalCities,
-            recent5: [...recent5], cacheHits
+            currentCity: city.name, cityProgress: (startIndex + processedCities) + '/' + totalCities,
+            recent5: [...recent5], cacheHits,
           }));
         }));
       }
 
-      controller.enqueue(sseEvent({ type: 'done', message: '\u722c\u53d6\u5b8c\u6210\uff01\u5171\u5904\u7406 ' + processed + ' \u5bb6\u9152\u5e97', totalHotels: totalCities, processed, cacheHits }));
+      // Clear progress on successful completion
+      await clearScrapeProgress();
+
+      controller.enqueue(sseEvent({
+        type: 'done',
+        message: '\u722c\u53d6\u5b8c\u6210\uff01\u5171\u5904\u7406 ' + processed + ' \u5bb6\u9152\u5e97',
+        totalHotels: totalCities, processed, cacheHits,
+      }));
       controller.close();
     },
   });

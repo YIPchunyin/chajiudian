@@ -1,9 +1,9 @@
 ﻿'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface ProgressEvent {
-  type: 'init' | 'total' | 'progress' | 'done' | 'error';
+  type: 'init' | 'total' | 'progress' | 'done' | 'error' | 'resume';
   message?: string;
   processed?: number;
   totalHotels?: number | string;
@@ -12,32 +12,62 @@ interface ProgressEvent {
   cityProgress?: string;
   canUse90Percent?: boolean;
   has90Percent?: boolean;
-  recent5?: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>;  cacheHits?: number;
+  recent5?: Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>;
+  cacheHits?: number;
+  completedCityIndex?: number;
+}
+
+interface SavedProgress {
+  hasProgress: boolean;
+  completedCityIndex?: number;
+  totalCities?: number;
+  processed?: number;
+  cacheHits?: number;
+  completedCityNames?: string[];
 }
 
 export default function ScrapeAll() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [recent5, setRecent5] = useState<Array<{ hotelName: string; has90Percent: boolean; canUse90Percent: boolean }>>([]);
-  const [processed, setProcessed] = useState(0);  const [cacheHits, setCacheHits] = useState(0);
+  const [processed, setProcessed] = useState(0);
+  const [cacheHits, setCacheHits] = useState(0);
   const [total, setTotal] = useState<number | string>('?');
   const [currentCity, setCurrentCity] = useState('');
   const [cityProgress, setCityProgress] = useState('');
   const [done, setDone] = useState(false);
   const [checkIn, setCheckIn] = useState(() => new Date().toISOString().split('T')[0]);
   const [checkOut, setCheckOut] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; });
+  const [savedProgress, setSavedProgress] = useState<SavedProgress | null>(null);
+  const [checkingProgress, setCheckingProgress] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
-  const handleStart = useCallback(async () => {
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/hotel/scrape-progress');
+        const data: SavedProgress = await res.json();
+        setSavedProgress(data);
+      } catch {
+        setSavedProgress(null);
+      } finally {
+        setCheckingProgress(false);
+      }
+    })();
+  }, []);
+
+  const handleStart = useCallback(async (resume: boolean = false) => {
     setRunning(true); setDone(false); setProgress(null);
-    setRecent5([]); setProcessed(0); setCacheHits(0); setTotal('?');
+    setRecent5([]); setProcessed(0); setCacheHits(0);
     setCurrentCity(''); setCityProgress('');
 
     const abort = new AbortController();
     abortRef.current = abort;
 
     try {
-      const res = await fetch('/api/hotel/scrape-all?checkIn=' + checkIn + '&checkOut=' + checkOut, { signal: abort.signal });
+      let url = '/api/hotel/scrape-all?checkIn=' + checkIn + '&checkOut=' + checkOut;
+      if (resume) url += '&resume=true';
+      const res = await fetch(url, { signal: abort.signal });
       const reader = res.body?.getReader();
       if (!reader) { setProgress({ type: 'error', message: '无法读取响应流' }); setRunning(false); return; }
 
@@ -54,7 +84,10 @@ export default function ScrapeAll() {
             try {
               const data: ProgressEvent = JSON.parse(line.substring(6));
               setProgress(data);
-              if (data.type === 'progress') {
+              if (data.type === 'resume') {
+                setProcessed(data.processed || 0);
+                if (data.cacheHits !== undefined) setCacheHits(data.cacheHits);
+              } else if (data.type === 'progress') {
                 setProcessed(data.processed || 0);
                 if (data.cacheHits !== undefined) setCacheHits(data.cacheHits);
                 if (data.recent5) setRecent5([...data.recent5]);
@@ -62,7 +95,7 @@ export default function ScrapeAll() {
                 if (data.currentCity) setCurrentCity(data.currentCity);
                 if (data.cityProgress) setCityProgress(data.cityProgress);
               } else if (data.type === 'total' && data.totalHotels) { setTotal(data.totalHotels); }
-              else if (data.type === 'done') { setDone(true); setRunning(false); if (data.cacheHits !== undefined) setCacheHits(data.cacheHits); }
+              else if (data.type === 'done') { setDone(true); setRunning(false); setSavedProgress(null); if (data.cacheHits !== undefined) setCacheHits(data.cacheHits); }
               else if (data.type === 'error') { setRunning(false); }
             } catch { }
           }
@@ -73,6 +106,7 @@ export default function ScrapeAll() {
     } finally { setRunning(false); abortRef.current = null; }
   }, [checkIn, checkOut]);
 
+  const handleResume = useCallback(() => { handleStart(true); }, [handleStart]);
   const handleStop = useCallback(() => { abortRef.current?.abort(); setRunning(false); }, []);
 
   return (
@@ -87,26 +121,54 @@ export default function ScrapeAll() {
           <div><label className="block text-sm font-medium text-gray-600 mb-1">入住日期</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} disabled={running} /></div>
           <div><label className="block text-sm font-medium text-gray-600 mb-1">离店日期</label><input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} disabled={running} /></div>
         </div>
+
+        {!running && !done && savedProgress?.hasProgress && !checkingProgress && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">{String.fromCodePoint(0x26a0)}</span>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 text-sm">检测到未完成的爬取记录</h3>
+                <p className="text-xs text-amber-700 mt-1">
+                  已完成 {savedProgress.completedCityIndex} / {savedProgress.totalCities} 个城市，已处理 {savedProgress.processed} 家酒店（缓存命中 {savedProgress.cacheHits} 次）
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={handleResume} className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
+                    {String.fromCodePoint(0x1f504)} 继续爬取
+                  </button>
+                  <button onClick={() => handleStart(false)} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
+                    {String.fromCodePoint(0x1f5d1)} 重新开始
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
-          <button onClick={handleStart} disabled={running} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
-            {running ? String.fromCodePoint(0x23f3) + ' 爬取中...' : String.fromCodePoint(0x1f4e1) + ' 开始逐城爬取'}
-          </button>
+          {(!savedProgress?.hasProgress || checkingProgress) && (
+            <button onClick={() => handleStart(false)} disabled={running} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
+              {running ? String.fromCodePoint(0x23f3) + ' 爬取中...' : String.fromCodePoint(0x1f4e1) + ' 开始逐城爬取'}
+            </button>
+          )}
           {running && <button onClick={handleStop} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">{String.fromCodePoint(0x26a0)} 停止</button>}
         </div>
+
+        {checkingProgress && <div className="text-xs text-gray-400 mt-2">{String.fromCodePoint(0x23f3)} 检查爬取进度...</div>}
       </div>
 
       {progress && (
         <div className="bg-white rounded-xl shadow p-6">
           <div className={'rounded-lg p-3 text-sm mb-4 ' + (progress.type === 'error' ? 'bg-red-50 text-red-600' : done ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700')}>
             {progress.type === 'init' && String.fromCodePoint(0x1f4e1) + ' ' + (progress.message || '初始化...')}
+            {progress.type === 'resume' && String.fromCodePoint(0x1f504) + ' ' + (progress.message || '恢复爬取...')}
             {progress.type === 'error' && '\u274c ' + (progress.message || '')}
             {done && '\u2705 ' + (progress.message || '爬取完成！')}
             {progress.type === 'progress' && !done && '\u23f3 ' + (progress.message || '正在爬取...')}
             {progress.type === 'total' && '\u2139 ' + (progress.message || '')}
           </div>
-          <div className="grid grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-600">{processed}</div><div className="text-xs text-blue-500">酒店</div></div>
-            <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-purple-600">{total}</div><div className="text-xs text-purple-500">城市</div></div>
+            <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-purple-600">{cacheHits}</div><div className="text-xs text-purple-500">缓存</div></div>
             <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-green-600">{cityProgress || '...'}</div><div className="text-xs text-green-500">进度</div></div>
           </div>
           {currentCity && <div className="text-sm text-gray-500 mb-3">当前城市：<span className="font-semibold text-gray-700">{currentCity}</span></div>}
@@ -128,7 +190,6 @@ export default function ScrapeAll() {
         </div>
       )}
 
-      {/* Download chajiudian table */}
       <div className="bg-white rounded-xl shadow p-6 text-center">
         <a href="/api/download-chajiudian" download className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-8 rounded-lg transition text-sm">
           {String.fromCodePoint(0x1f4e5)} 下载 chajiudian 表格

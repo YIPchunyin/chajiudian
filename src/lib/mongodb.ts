@@ -42,6 +42,43 @@ export async function findCachedHotel(hotelName: string): Promise<ChajiudianReco
   }
 }
 
+
+export interface ScrapeProgress {
+  date: string;
+  completedCityIndex: number;
+  totalCities: number;
+  processed: number;
+  cacheHits: number;
+  completedCityNames: string[];
+  updatedAt: Date;
+}
+
+export async function getScrapeProgress(): Promise<ScrapeProgress | null> {
+  try {
+    const col = await getCollection<ScrapeProgress>('scrape_progress');
+    const today = new Date().toISOString().split('T')[0];
+    return await col.findOne({ date: today });
+  } catch { return null; }
+}
+
+export async function saveScrapeProgress(progress: ScrapeProgress): Promise<void> {
+  try {
+    const col = await getCollection<ScrapeProgress>('scrape_progress');
+    await col.updateOne(
+      { date: progress.date },
+      { $set: progress },
+      { upsert: true }
+    );
+  } catch { }
+}
+
+export async function clearScrapeProgress(): Promise<void> {
+  try {
+    const col = await getCollection<ScrapeProgress>('scrape_progress');
+    const today = new Date().toISOString().split('T')[0];
+    await col.deleteOne({ date: today });
+  } catch { }
+}
 export async function saveHotelCache(record: ChajiudianRecord): Promise<void> {
   try {
     const col = await getCollection<ChajiudianRecord>('chajiudian');
