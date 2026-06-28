@@ -3,61 +3,37 @@ import * as QRCode from 'qrcode';
 
 const HAIDILAO_API = 'https://superapp-public.kiwa-tech.com/api/gateway/tydc/front/queue/getVipCodeAndTime';
 
-export async function POST(request: NextRequest) {
+// Headers extracted from captured HAR data - fully hardcoded
+// Token and device params are stable across sessions
+function buildHeaders(): Record<string, string> {
+  return {
+    '_haidilao_app_token': 'TOKEN_APP_e8ac04f6-6bbf-47a8-873d-aff8e0c60511',
+    'user-agent': 'Dart/3.6 (dart:io)',
+    'k1': 'Android',
+    'accept-encoding': 'gzip',
+    'publicattribute': '{"$lib": "Android"}',
+    'content-type': 'application/json',
+    'x-source': 'app',
+    'k3': String(Date.now()),
+    'http_wallet_api_version': '2.0',
+    'k4': 'bGEjl70Epa86zfk1',
+    'systype': 'Android',
+    'k5': '0a13c288',
+    'kid': 'Android.20260628.9cf3.3c5f07',
+    'x-device-model': 'Phone',
+    'version': '9.10.4',
+    'k6': 'rBYDIG60AwDbmaQtiX1jtGm4ZYM=',
+    'x-device-mobile-type': 'REDMI-2510DRK44C',
+    'platformname': 'app',
+    'x-device-id': '692152c9-3090-4106-9340-fcdfc2f5e1ad',
+    'k2': '0nZBSgo33VqrYhlFefpMlgX2Z5zzsoDG',
+    'x-device-mobile-name': 'REDMI-2510DRK44C',
+  };
+}
+
+export async function GET() {
   try {
-    const body = await request.json();
-    const { token, rawHeaders } = body;
-
-    // Build headers from user-provided raw headers or individual fields
-    let headers: Record<string, string> = {};
-
-    if (rawHeaders) {
-      // Parse raw HTTP headers
-      const lines = rawHeaders.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('POST') || trimmed.startsWith('GET') || trimmed.startsWith('HTTP')) continue;
-        const colonIdx = trimmed.indexOf(':');
-        if (colonIdx > 0) {
-          const key = trimmed.substring(0, colonIdx).trim().toLowerCase();
-          // Use the standardized key for known headers, original case for custom ones
-          const val = trimmed.substring(colonIdx + 1).trim();
-          headers[trimmed.substring(0, colonIdx).trim()] = val;
-        }
-      }
-      // Override token with user input (in case it changed)
-      if (token) headers['_haidilao_app_token'] = token;
-      // Update k3 (timestamp)
-      headers['k3'] = String(Date.now());
-    } else if (token) {
-      // Fallback to old method
-      const { k2, k4, k5, k6, kid, deviceId } = body;
-      headers = {
-        '_haidilao_app_token': token,
-        'user-agent': 'Dart/3.6 (dart:io)',
-        'k1': 'Android',
-        'accept-encoding': 'gzip',
-        'publicattribute': '{"$lib": "Android"}',
-        'content-type': 'application/json',
-        'x-source': 'app',
-        'k3': String(Date.now()),
-        'http_wallet_api_version': '2.0',
-        'systype': 'Android',
-        'x-device-mobile-type': 'REDMI-2510DRK44C',
-        'x-device-mobile-name': 'REDMI-2510DRK44C',
-        'version': '9.10.4',
-        'platformname': 'app',
-        'host': 'superapp-public.kiwa-tech.com',
-      };
-      if (k2) headers['k2'] = k2;
-      if (k4) headers['k4'] = k4;
-      if (k5) headers['k5'] = k5;
-      if (k6) headers['k6'] = k6;
-      if (kid) headers['kid'] = kid;
-      if (deviceId) headers['x-device-id'] = deviceId;
-    } else {
-      return NextResponse.json({ success: false, error: '缺少 _haidilao_app_token 或请求头' }, { status: 400 });
-    }
+    const headers = buildHeaders();
 
     const response = await fetch(HAIDILAO_API, {
       method: 'POST',
@@ -72,6 +48,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: data.msg || '海底捞API请求失败',
         code: data.code,
+        hint: 'token或签名参数可能已过期，请重新抓包获取最新数据',
       }, { status: 400 });
     }
 
@@ -93,7 +70,6 @@ export async function POST(request: NextRequest) {
       qrDataUrl,
       nickName: data.data?.nickName,
       sysTime: data.data?.sysTime,
-      rawResponse: data,
     });
 
   } catch (error: any) {
