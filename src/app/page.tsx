@@ -8,6 +8,7 @@ import BatchCheck from '@/components/BatchCheck';
 import FileCheck from '@/components/FileCheck';
 import ScrapeAll from '@/components/ScrapeAll';
 import JsonViewer from '@/components/JsonViewer';
+import HaidilaoVipCode from '@/components/HaidilaoVipCode';
 
 const getDefaultForm = (): HotelRequest => ({
   activityId: '',
@@ -34,7 +35,7 @@ const COUPON_TYPE_LABELS: Record<number, string> = {
 type Step = 'search' | 'birthday' | 'coupon';
 
 export default function Home() {
-  const [mode, setMode] = useState<'coupon' | 'api' | 'batch' | 'file' | 'scrape'>('coupon');
+  const [mode, setMode] = useState<'coupon' | 'api' | 'batch' | 'file' | 'scrape' | 'haidilao'>('coupon');
   const [step, setStep] = useState<Step>('search');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -94,9 +95,9 @@ export default function Home() {
     }
   };
 
-  const switchMode = (newMode: 'coupon' | 'api' | 'batch' | 'file' | 'scrape') => {
+  const switchMode = (newMode: 'coupon' | 'api' | 'batch' | 'file' | 'scrape' | 'haidilao') => {
     setMode(newMode);
-    if (newMode === 'api' || newMode === 'file' || newMode === 'scrape') return;
+    if (newMode === 'api' || newMode === 'file' || newMode === 'scrape' || newMode === 'haidilao') return;
     setStep('search');
     setSearchKeyword('');
     setSearchHotelId(null);
@@ -135,12 +136,14 @@ export default function Home() {
             <button onClick={() => switchMode('coupon')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'coupon' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f382)} {'\u641c\u7d22'}</button>
             <button onClick={() => switchMode('batch')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'batch' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4ca)} {'\u6279\u91cf'}</button>
             <button onClick={() => switchMode('file')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4c4)} {'\u8868\u683c'}</button>
-            <button onClick={() => switchMode('scrape')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'scrape' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} {'\u722c\u53d6'}</button>
+            <button onClick={() => switchMode('haidilao')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'haidilao' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{'\U0001f372'} 海底捞</button>
+              <button onClick={() => switchMode('scrape')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'scrape' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} {'\u722c\u53d6'}</button>
             <button onClick={() => switchMode('api')} className={'px-3 py-1.5 text-sm font-medium rounded-md transition ' + (mode === 'api' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>{String.fromCodePoint(0x1f4e1)} API</button>
           </div>
         </div>
 
-        {mode === 'scrape' && <ScrapeAll />}
+        {mode === 'haidilao' && <HaidilaoVipCode />}
+          {mode === 'scrape' && <ScrapeAll />}
 
         {mode === 'file' && <FileCheck />}
 
